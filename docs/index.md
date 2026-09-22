@@ -1,0 +1,24 @@
+{%
+   include-markdown "../README.md"
+%}
+
+## Start here: document your project
+
+This site is **Paleofuturistic Python Project's** documentation. The template scaffolded the structure — now it's
+yours to fill in with docs about what your software does.
+
+- **[Document your project](developer/how-to/document-your-project.md)** — how to use the four Diátaxis
+  sections for *your* code, add pages, and get an API reference for free from your docstrings.
+- **[About Paleofuturistic Python Project](explanation/about-your-project.md)** — a starter page to explain the *why*
+  of your project. Edit it, then keep going.
+
+## How this site is organized
+
+The four [Diátaxis](https://diataxis.fr/) sections in the navigation bar at the top — **Tutorials**, **How-to**,
+**Reference**, **Explanation** — are *yours*: each ships with a starter page full of coaching notes,
+waiting to be replaced with documentation for your users.
+
+The **Developer** section is different: it's the manual for the scaffold this project inherited from the
+[Paleofuturistic Python](https://github.com/schubergphilis/paleofuturistic_python) template — the daily
+workflow, the task runner, testing, security, releasing, and the design rationale behind it all.
+[The scaffold](developer/index.md) gives the quick tour.

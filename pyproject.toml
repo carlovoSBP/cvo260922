@@ -1,0 +1,427 @@
+[project]
+name = "cvo260922"
+version = "0.0.0"
+description = "Development flow as Paleofuturistic Python"
+readme = "README.md"
+authors = [
+    {name = "John Doe", email = "me@here.now"},
+]
+requires-python = ">=3.10"
+dependencies = []
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+classifiers = [
+    # Python versions supported by the package
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+
+[dependency-groups]
+dev = [
+    {include-group = "develop"},
+    {include-group = "document"},
+    {include-group = "lint"},
+    {include-group = "quality"},
+    {include-group = "security"},
+    {include-group = "test"},
+]
+develop = [
+    "pre-commit==4.6.1",
+    # TOML parsing for the _CI tooling on Python < 3.11, which has no stdlib
+    # `tomllib`. Imported via a version-guarded fallback in _CI/info.py,
+    # _CI/tasks/sbom.py and _CI/tasks/test.py.
+    "tomli==2.4.1 ; python_version < '3.11'",
+]
+document = [
+    "properdocs==1.6.7",
+    "properdocs-theme-mkdocs==1.6.7",
+    "mkdocs-include-markdown-plugin==7.3.0",
+    "mkdocstrings[python]==1.0.6",
+]
+lint = [
+    "commitizen==4.17.0",
+    "complexipy==6.2.0",
+    "pylint==4.0.6",
+    # Held below the exclude-newer boundary, unlike every other pin here. ruff 0.16 reports
+    # 18 findings on a freshly generated project where 0.15.22 reports none, because it lints
+    # `_CI/` against `_CI/pyproject.toml`, which declares `requires-python = ">=3.12"` while
+    # the project itself may target 3.10. Two of those findings (UP036 on the tomli fallback,
+    # UP017 on `datetime.UTC`) would break generated projects on 3.10 if applied. Fixing the
+    # python-target mismatch is a separate change; see the ruff-0.16 migration issue.
+    "ruff==0.15.22",
+    # Newest version clearing the [tool.uv] exclude-newer boundary.
+    "ty==0.0.69",
+]
+quality = [
+    "pyscn==1.29.0",
+]
+security = [
+    "cyclonedx-bom==7.3.1",
+    "cyclonedx-python-lib[json-validation]==11.11.0",
+    "pip-audit==2.10.1",
+]
+test = [
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+    "pytest-env==1.7.0",
+    "pytest-html==4.2.0",
+    "pytest-xdist==3.8.0",
+    # Pin uv to match [tool.uv] required-version — tox-uv depends on the uv
+    # Python package, which installs a uv binary into .venv/bin that would
+    # otherwise shadow the image's /usr/local/bin/uv and break the check.
+    # Bump with `./workflow.cmd develop.bump-uv`, never by hand: this is one of five
+    # places the uv version appears, and one of them carries an image digest that has
+    # to move with it.
+    "uv==0.12.6",
+    "tox==4.58.0",
+    "tox-uv==1.36.0",
+]
+
+[build-system]
+# The upper bound tracks the pinned uv. Bump with `./workflow.cmd develop.bump-uv`.
+requires = ["uv_build>=0.8.15,<=0.12.6"]
+build-backend = "uv_build"
+
+[tool.pyscn.complexity]
+paths = ["src", "tests", "_CI/tasks"]
+low_threshold = 5
+medium_threshold = 10
+max_complexity = 15
+
+[tool.pyscn.dead_code]
+min_severity = "warning"
+
+[tool.pyscn.output]
+directory = "reports"
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version_provider = "uv"
+version_scheme = "pep440"
+tag_format = "v$version"
+changelog_file = "docs/changelog.md"
+
+[tool.commitizen.change_type_map]
+feat = "Features"
+fix = "Bug Fixes"
+perf = "Performance"
+refactor = "Refactoring"
+docs = "Documentation"
+build = "Build"
+ci = "CI"
+chore = "Chores"
+revert = "Reverts"
+
+[tool.ruff]
+target-version = "py310"
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+    "scratch",
+    "_CI/lib",
+]
+# Black's default of 88 quickly feels overly restricted.
+line-length = 120
+indent-width = 4
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    # Docstring style conflicts (pick one from each pair)
+    "D203",    # one-blank-line-before-class (conflicts with D211)
+    "D213",    # multi-line-summary-second-line (conflicts with D212)
+    # Copyright headers are intentionally not added to source files
+    # This will change when automated tools start doing something with them
+    "CPY001",  # missing-copyright-notice
+    # A list of common ignores, uncomment or remove at your discretion
+    # "D105",    # undocumented-magic-method
+    # "D107",    # undocumented-public-init
+    # "TRY003",  # raise-vanilla-args
+    # "EM101",   # raw-string-in-exception
+    # "EM102",   # f-string-in-exception
+    # "BLE001",  # blind-exception (legitimate in network code)
+    # "FBT001",  # boolean-type-hint-positional-argument
+    # "FBT002",  # boolean-default-value-positional-argument
+    # "PLR0912", # too-many-branches
+    # "PLR0913", # too-many-arguments
+    # "PLR0915", # too-many-statements
+    # "C901",    # complex-structure
+    # "PLC0415", # import-outside-toplevel (used intentionally)
+    # "ANN002",  # missing-type-args
+    # "ANN003",  # missing-type-kwargs
+    # "ANN401",  # dynamically-typed-expression (Any in **kwargs is legitimate)
+    # "TD",      # todo comments
+    # "FIX",     # fixme comments
+    # "ERA",     # commented-out code
+    # Formatter conflicts
+    "COM812",  # missing-trailing-comma (conflicts with formatter)
+    "Q000",    # bad-quotes-inline-string (conflicts with format.quote-style)
+    "Q003",
+]
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["S101", "S311", "RUF012", "PLR2004"]
+"src/*.py" = ["UP038"]
+
+[tool.ruff.format]
+# Use single quotes for strings, because that is more readable.
+quote-style = "single"
+
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
+
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+
+[tool.ty.environment]
+extra-paths = ["_CI/lib/vendor"]
+
+# py-serializable annotates its class decorator as returning
+# `Intersection[Type[_T], Type[_JsonSerializable], Type[_XmlSerializable]]`. PEP intersection
+# types do not exist, so its own documented stopgap is `from typing import Union as
+# Intersection`. The annotation therefore declares a *union*, and calling a union whose
+# members include two argument-less mixins is genuinely unsound. ty reports exactly what is
+# written; the annotation is what is wrong, not the checker.
+#
+# Older ty resolved those mixins as `@Todo` and checked nothing here, which is why this
+# surfaced as a "regression" when ty gained the ability to model them. Silencing these four
+# rules costs less than the alternative of freezing ty, which left every cyclonedx
+# constructor call in this module unchecked instead.
+#
+# The same union also leaks into a *return* annotation: writing `-> Component` names a class
+# whose own decorator resolves to that unsound union, and `invalid-type-form` reports it.
+# That one is not in this list — it lands on eleven identifiable `def` lines in `sbom.py`
+# rather than on every constructor call, so it is tagged there with
+# `# ty: ignore[invalid-type-form]` instead of ignored for the whole file. A per-line tag is
+# also the one ty itself will flag as unused the day py-serializable's annotation is fixed;
+# a file-wide ignore here would give no such signal.
+#
+# Scoped to the one module that touches those classes. Every other rule still applies
+# there — an `invalid-assignment` in this file is still an error.
+# Revisit when py-serializable can express an intersection or ships stubs.
+[[tool.ty.overrides]]
+include = ["_CI/tasks/sbom.py"]
+
+[tool.ty.overrides.rules]
+unknown-argument = "ignore"
+unresolved-attribute = "ignore"
+too-many-positional-arguments = "ignore"
+invalid-argument-type = "ignore"
+
+[tool.pylint.MASTER]
+init-hook = "import sys; sys.path.append('src/'); sys.path.append('_CI/lib/vendor/')"
+
+[tool.pylint."MESSAGES CONTROL"]
+max-line-length = 120
+disable = [
+    "too-few-public-methods",
+    "duplicate-code",
+    "logging-fstring-interpolation",
+    "too-many-ancestors",
+    "import-outside-toplevel",
+    # Complexity thresholds — already enforced by ruff (PLR0912/PLR0913/PLR0915)
+    "too-many-arguments",
+    "too-many-positional-arguments",
+    "too-many-branches",
+    "too-many-statements",
+    "too-many-locals",
+    "too-many-instance-attributes",
+    # Design choices
+    "unused-argument",           # handled by ruff ARG rules
+    "wrong-import-position",     # handled by ruff isort
+    # "broad-exception-caught",    # legitimate in network/auth code
+    # "protected-access",          # companion-object pattern
+]
+
+[tool.pytest.ini_options]
+addopts = [
+    # A fixed worker count, not `-n auto`. Under `tox run-parallel` every env spawns its own
+    # pool, so `auto` on a 16-core machine asks for five times sixteen workers and the run comes
+    # out slower than the same config on four cores. Four is chosen for the suite this project
+    # will have rather than the one it ships with: on the scaffold's two tests xdist costs more
+    # than it saves (about 0.5s per env), and it starts paying once a suite is large enough to
+    # spread. Raise it when four workers are the bottleneck; drop to `-n 0` while the suite is
+    # still tiny and you mind the second.
+    "-n", "4",
+    "--strict-markers",
+    # Terminal summary and the JSON the badge and the ratchet read. No HTML: nothing in a hook
+    # or a pipeline opens one, so the gate stops producing artefacts for an absent reader. The
+    # saving is real but small — about half a second per matrix run — and the reason is the rule
+    # rather than the clock. `test.coverage` renders the coverage HTML on demand and `test.view`
+    # the test report.
+    "--cov", "--cov-report=term-missing",
+    # `coverage.local.json`, not `coverage.json`. The plain name means the union across
+    # `env_list`, which the badge and the ratchet read; a bare `pytest` measures one
+    # interpreter, and under `run-parallel` tox overrides this line to a per-env path — so
+    # leaving the plain name here had `test.pytest` outside tox quietly overwrite the union's
+    # file with one interpreter's number. Nothing reads this one.
+    "--cov-report=json:reports/coverage.local.json",
+    # pytest-cov enforces `[tool.coverage.report] fail_under` once per interpreter, and no single
+    # interpreter can clear a floor the ratchet set from the union of the whole matrix — a line
+    # only the newest version reaches is missing from every older run. The floor is enforced
+    # where the union exists, in `combine_coverage`; here it is switched off.
+    "--cov-fail-under=0",
+]
+markers = []
+filterwarnings = []
+pythonpath = ["src"]
+testpaths = ["tests"]
+env = []
+env_files = [".env"]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 0
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "@overload",
+]
+
+[tool.coverage.paths]
+source = [
+    "src/",
+    "*/site-packages/",
+]
+
+[tool.coverage.html]
+directory = "reports/coverage"
+
+[tool.test-ratchet]
+# `auto-detect` (default): the coverage ratchet stays dormant while the scaffolded
+# `test_sanity` function is still present in `tests/test_<slug>.py`. That trivial smoke
+# test produces 100% coverage out of the box, so engaging the ratchet on day one would
+# lock the bar at 100 and fail every subsequent real change. The ratchet activates the
+# moment you remove or rename `test_sanity` — once `[tool.coverage.report] fail_under`
+# is bumped above 0, it never drops back to dormant.
+#
+# `strict`: the ratchet engages immediately, even with the scaffold in place. Useful
+# when you're seeding the template into an existing codebase whose coverage is already
+# meaningful, or when you genuinely want a 100% floor from the first run.
+#
+# Either way, once engaged, the bar only goes up. See docs/developer/explanation/testing-strategy.md
+# for the full design rationale.
+mode = "auto-detect"
+
+
+[tool.uv]
+# This version was the newest release that had been public for a week when the project was
+# generated. It does not advance on its own — `./workflow.cmd develop.bump-uv` moves it, and
+# every other place it appears, together. Editing it here alone leaves the base image below
+# pinned to the old version's digest.
+required-version = "==0.12.6"
+# Fixed date, not a relative window. A rolling `"1 week"` moved forward every day, so a
+# resolution — and therefore a green pipeline — could change with no commit behind it.
+# Every dependency above is pinned exactly, so this bounds the transitive closure.
+#
+# The value was stamped with the date this project was generated, and stays put until you
+# move it. Raising it is a deliberate act: change the date, re-resolve, and land the
+# resulting pin bumps and `uv.lock` in the same commit so the boundary and the pins never
+# disagree. See docs/developer/reference/dependency-groups.md for the flow.
+#
+# (The literal below is only a fallback; `tasks_render.py` overwrites it at generation.)
+exclude-newer = "2026-09-22"
+
+[tool.tox]
+requires = ["tox>=4.21", "tox-uv>=1.16"]
+env_list = [
+    "py310",
+    "py311",
+    "py312",
+    "py313",
+    "py314",
+]
+
+[tool.tox.env_run_base]
+runner = "uv-venv-lock-runner"
+dependency_groups = ["test"]
+# Per-env coverage data file so `tox run-parallel` doesn't race two writers
+# (pytest-cov + xdist already produces parallel-mode files; without this each
+# env scans the same project root and combines partially-written DBs from the
+# sibling env, producing intermittent `no such table: file` SQLite errors).
+set_env = { COVERAGE_FILE = ".coverage.{envname}" }
+# A per-env *report* path for the same reason as the per-env data file above. `addopts` sends
+# the JSON report to one fixed path, so under `run-parallel` all five envs were writing
+# `reports/coverage.json` at once. It stayed invisible while nothing read that file — until the
+# coverage badge and the `fail_under` ratchet started reading it, at which point they would be
+# reading whichever env happened to finish last, possibly mid-write.
+#
+# pytest-cov keys reports by type, so a `json:` spec here replaces the one from `addopts`
+# rather than adding to it. `test.tox` combines the per-env data into one
+# `reports/coverage.json` afterwards.
+commands = [
+    [
+        "pytest",
+        "--cov-report=json:reports/coverage.{envname}.json",
+        { replace = "posargs", default = [], extend = true },
+    ],
+]
+
+[tool.docker-versions]
+# The container image `Dockerfile.deps` builds on, used by both hosts: `container.py` passes
+# it as a build arg. The uv version lives in [tool.uv] required-version above — `info.uv-version` parses it
+# from there — and is repeated in the tag below by hand.
+#
+# It carries a tag *and* a digest. The tag stays for readability; the digest is what actually
+# resolves, so an upstream retag cannot change what this project builds on. The digest is also
+# an input to the deps-image tag, so changing it rebuilds rather than serving a cached image
+# built from the old base.
+#
+# Use `./workflow.cmd develop.bump-uv` rather than editing this line: it moves the tag and
+# re-resolves the digest in one step. A reference carrying both resolves to the *digest*, so a
+# hand-bumped tag left beside the old digest silently keeps building the previous image.
+base-image = "ghcr.io/astral-sh/uv:0.12.6-python3.10-trixie-slim@sha256:b30faee4e4774ac16bd5a8e80acbef76679d3a537121b50b0fb79e07fd8dc2bb"

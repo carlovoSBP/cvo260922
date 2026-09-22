@@ -1,0 +1,180 @@
+"""Documentation task definitions."""
+
+import re
+from pathlib import Path
+from typing import cast
+
+from invoke import Collection, Context, Task, task
+
+from .github import pipeline_badge, request_pages_build
+from .shared import apply_badge, execute, is_ci, logged, open_target, run, run_steps
+
+VERSION_BADGE = r'(\[!\[Version\]\(https://img\.shields\.io/badge/version-)[^)]+(\))'
+
+# The shipped CI badge, before anyone has run `preflight --write` in a clone with a remote. The
+# only thing the gate can say about that badge without knowing which clone is canonical.
+PIPELINE_PLACEHOLDER = re.compile(r'img\.shields\.io/badge/(build|pipeline)-unknown')
+
+
+def update_package_version_badge(*, version: str = '', write: bool = True) -> str | None:
+    """Bring the README's version badge in line with the version in pyproject.toml.
+
+    Args:
+        version: Use this version instead of the one in pyproject.toml. `release.bump` passes
+            the version it is about to write, so the badge can be refreshed *before* `cz bump`
+            runs and be swept into the same commit the release tag points at.
+        write: Update README.md. When False, report what would change and touch nothing.
+
+    Returns:
+        None when the badge is already right, else a one-line reason it is not.
+
+    """
+    if version:
+        return apply_badge(
+            Path('README.md'),
+            VERSION_BADGE,
+            rf'\g<1>{version}-blue\2',
+            label='version badge',
+            detail=version,
+            write=write,
+        )
+    pyproject = Path('pyproject.toml')
+    if not pyproject.exists():
+        return None
+    match = re.search(r'^version\s*=\s*"([^"]+)"', pyproject.read_text(encoding='utf-8'), re.MULTILINE)
+    if not match:
+        return None
+    return apply_badge(
+        Path('README.md'),
+        VERSION_BADGE,
+        rf'\g<1>{match.group(1)}-blue\2',
+        label='version badge',
+        detail=match.group(1),
+        write=write,
+    )
+
+
+def update_pipeline_badge(context: Context, *, write: bool = True) -> str | None:
+    """Point the CI badge at the host's own status endpoint, derived from `origin`.
+
+    The one derived value whose *content* never goes stale: the host renders the current status
+    on every page load, so this writes a URL once and then has nothing left to do.
+
+    Its *URL* comes from `origin`, which is the developer's local configuration rather than a
+    property of the tree — so the gate must not ask whether the badge matches this clone. A
+    contributor whose remote is a fork would fail a check whose only fix points upstream's badge
+    at their fork. Written on `--write` by whoever runs it in the canonical clone, refreshed the
+    same way if the repository moves.
+
+    One thing *is* answerable from the tree, and verifying stops there: the README still holding
+    the shipped placeholder while a remote exists. That is nobody's legitimate state — it is the
+    owner having generated, committed and pushed without filling the badge in, which used to
+    leave `build-unknown` in place permanently because nothing ever asked. A real URL passes
+    whatever it names, so the fork case is untouched, and a project with no readable `origin` has
+    not been pushed anywhere yet, so its placeholder passes too.
+
+    Args:
+        context: Invoke context, for reading `origin`.
+        write: Update README.md. When False, report what would change and touch nothing.
+
+    Returns:
+        None when the badge already points at the right place, else a one-line reason.
+
+    """
+    readme = Path('README.md')
+    badge = pipeline_badge(context)
+    if not write:
+        if not badge or not readme.exists():
+            return None
+        placeholder = PIPELINE_PLACEHOLDER.search(readme.read_text(encoding='utf-8'))
+        if placeholder:
+            return f'{placeholder.group(1)} badge in README.md is still the placeholder, and origin is set'
+        return None
+    if not badge:
+        return None
+    return apply_badge(
+        Path('README.md'),
+        r'\[!\[(?:Build|Pipeline)\]\([^)]+\)\]\([^)]+\)',
+        badge.replace('\\', '\\\\'),
+        label='CI badge',
+        detail="the host's live status endpoint",
+        write=write,
+    )
+
+
+def update_python_badge(*, write: bool = True) -> str | None:
+    """Bring the README's Python badge in line with the classifiers in pyproject.toml.
+
+    Args:
+        write: Update README.md. When False, report what would change and touch nothing.
+
+    Returns:
+        None when the badge is already right, else a one-line reason it is not.
+
+    """
+    pyproject = Path('pyproject.toml')
+    if not pyproject.exists():
+        return None
+    versions = re.findall(
+        r'"Programming Language :: Python :: (\d+\.\d+)"',
+        pyproject.read_text(encoding='utf-8'),
+    )
+    if not versions:
+        return None
+    label = '%20%7C%20'.join(versions)
+    return apply_badge(
+        Path('README.md'),
+        r'(\[!\[Python\]\(https://img\.shields\.io/badge/python-)[^)]+(\))',
+        rf'\g<1>{label}-blue?logo=python&logoColor=white\2',
+        label='Python badge',
+        detail=' | '.join(versions),
+        write=write,
+    )
+
+
+@task
+@logged('document.build')
+@run('uv run properdocs build --strict')
+def build(context: Context) -> None:
+    """Build the documentation."""
+
+
+@task
+@logged('document.serve')
+@run('uv run properdocs serve')
+def serve(context: Context) -> None:
+    """Serve the documentation locally with live reload. Ctrl-C to stop."""
+
+
+@task
+@logged('document.view')
+def view(context: Context) -> None:
+    """Open the built documentation in the default browser. Skipped in CI."""
+    if is_ci():
+        return
+    open_target(context, 'site/index.html')
+
+
+@task
+@logged('document.deploy-github')
+def deploy_github(context: Context) -> None:
+    """Build the docs, push them to the `gh-pages` branch, and request the Pages build."""
+    execute(context, 'uv run properdocs gh-deploy --force')
+    request_pages_build(context)
+
+
+@task
+@logged('document')
+def document(context: Context) -> None:
+    """Build and open the documentation; reports all failures before exiting."""
+    # No badge is written here: "document" is not a command named for changing your README.
+    # `preflight --write` refreshes all five, and the gate names it when one is stale.
+    run_steps(build, view)(context)
+
+
+namespace = Collection('document')
+namespace.add_task(cast(Task, document), default=True, name='all')
+namespace.add_task(cast(Task, build))
+namespace.add_task(cast(Task, serve))
+namespace.add_task(cast(Task, view))
+namespace.add_task(cast(Task, deploy_github), name='deploy-github')

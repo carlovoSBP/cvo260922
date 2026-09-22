@@ -1,0 +1,14 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: 74439e6
+_src_path: https://github.com/costastf/paleofuturistic_python
+email: me@here.now
+full_name: John Doe
+git_hosting_service: github
+integrate_dependency_track: false
+integrate_pages: true
+license: Apache-2.0
+max_python_version: '3.14'
+min_python_version: '3.10'
+project_description: Development flow as Paleofuturistic Python
+project_name: Paleofuturistic Python Project
+project_slug: cvo260922
